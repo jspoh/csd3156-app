@@ -31,6 +31,11 @@ def seed_for_date(date_str: str) -> int:
     return int.from_bytes(h[:8], "big") & 0x7FFFFFFFFFFFFFFF
 
 
+@app.route("/")
+def status():
+    return "OK"
+
+
 @app.route("/daily-seed")
 def get_seed():
     # print("get_seed")
