@@ -58,7 +58,7 @@ class Tilt2048ViewModel(
     private var neutralY: Float = 0f
     private var latestX: Float = 0f
     private var latestY: Float = 0f
-    private var waitingForNeutral: Boolean = false
+    // private var waitingForNeutral: Boolean = false
     private var lastMoveAtMillis: Long = 0L
     // Shake Sensor
     private var lastShakeTime: Long = 0L
@@ -130,7 +130,7 @@ class Tilt2048ViewModel(
     }
 
     fun onTiltControlsEnabledChanged(enabled: Boolean) {
-        waitingForNeutral = false
+        // waitingForNeutral = false
         _uiState.update { current ->
             current.copy(tiltControlsEnabled = enabled)
         }
@@ -148,7 +148,7 @@ class Tilt2048ViewModel(
     fun onCalibrateTilt() {
         neutralX = latestX
         neutralY = latestY
-        waitingForNeutral = false
+        // waitingForNeutral = false
         persistSettings()
     }
 
@@ -186,13 +186,13 @@ class Tilt2048ViewModel(
         val deadZone = DEAD_ZONE_BASE / currentState.tiltSensitivity
         val neutralResetZone = deadZone * NEUTRAL_RESET_MULTIPLIER
 
-        if (waitingForNeutral) {
-            if (magnitude <= neutralResetZone) {
-                waitingForNeutral = false
-            } else {
-                return
-            }
-        }
+        // if (waitingForNeutral) {
+        //     if (magnitude <= neutralResetZone) {
+        //         waitingForNeutral = false
+        //     } else {
+        //         return
+        //     }
+        // }
 
         if (magnitude < deadZone) {
             return
@@ -203,7 +203,7 @@ class Tilt2048ViewModel(
         }
 
         val direction = primaryDirection(deltaX, deltaY)
-        waitingForNeutral = true
+        // waitingForNeutral = true
         lastMoveAtMillis = sample.timestampMillis
         applyMove(direction)
     }
