@@ -25,11 +25,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 private const val PREFS_NAME = "tilt2048_prefs"
 private const val KEY_PLAYER_NAME = "player_name"
 
 @Composable
+
 fun MenuScreen(onStartGame: (String) -> Unit, onSettings: () -> Unit) {
     val context = LocalContext.current
     var showDialog by remember { mutableStateOf(false) }
@@ -38,6 +41,8 @@ fun MenuScreen(onStartGame: (String) -> Unit, onSettings: () -> Unit) {
             .getString(KEY_PLAYER_NAME, "") ?: ""
         mutableStateOf(saved)
     }
+    // For vibration
+    val haptic = LocalHapticFeedback.current
 
     Column(
         modifier = Modifier
@@ -50,16 +55,23 @@ fun MenuScreen(onStartGame: (String) -> Unit, onSettings: () -> Unit) {
         Spacer(modifier = Modifier.height(48.dp))
 
         Button(
-            onClick = { showDialog = true },
-            modifier = Modifier.fillMaxWidth().height(60.dp)
-        ) {
+            onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onStartGame()
+        },
+            modifier = Modifier
+            .fillMaxWidth()
+            .height(60.dp)) {
             Text("PLAY GAME")
         }
         Spacer(modifier = Modifier.height(16.dp))
         OutlinedButton(
-            onClick = onSettings,
-            modifier = Modifier.fillMaxWidth().height(60.dp)
-        ) {
+            onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onSettings()
+        }, modifier = Modifier
+            .fillMaxWidth()
+            .height(60.dp)) {
             Text("SETTINGS")
         }
     }
