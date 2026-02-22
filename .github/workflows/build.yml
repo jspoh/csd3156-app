@@ -34,6 +34,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Check Kotlin naming conventions (ktlint)
+        run: ./gradlew ktlintCheck --stacktrace
+
       - name: Run unit tests
         run: ./gradlew test --stacktrace
 

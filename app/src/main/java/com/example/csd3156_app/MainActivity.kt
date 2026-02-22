@@ -13,7 +13,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.csd3156_app.ui.game.SettingsScreen
-import com.example.csd3156_app.ui.theme.CSD3156_APPTheme
+import com.example.csd3156_app.ui.theme.AppTheme
 import com.example.csd3156_app.ui.game.Tilt2048Route
 import com.example.csd3156_app.ui.game.Tilt2048ViewModel
 
@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            CSD3156_APPTheme {
+            AppTheme {
                 val navController = rememberNavController()
                 val viewModel: Tilt2048ViewModel = viewModel()
                 val uiState by viewModel.uiState.collectAsState()
