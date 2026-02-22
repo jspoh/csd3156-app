@@ -295,6 +295,10 @@ class Tilt2048ViewModel(
     }
 
     private fun applyMove(direction: Direction) {
+        // Block all input while the game result overlay is visible
+        val currentUiState = _uiState.value
+        if (currentUiState.isGameOver || currentUiState.hasWon) return
+
         val result = gameEngine.move(direction)
         if (!result.moved) {
             return
@@ -314,6 +318,8 @@ class Tilt2048ViewModel(
             dailySeed = currentDailySeed
         )
 
+        val gameEnded = result.state.isGameOver || result.state.hasWon
+
         viewModelScope.launch {
             ensureSessionExists(result.state)
             val sessionId = currentSessionId
@@ -326,7 +332,7 @@ class Tilt2048ViewModel(
                     isFinished = result.state.isGameOver
                 )
             }
-            if (result.state.isGameOver) {
+            if (gameEnded) {
                 finishCurrentSessionIfNeeded(result.state.score)
                 submitDailyScoreIfNeeded(force = false)
             }
@@ -334,21 +340,21 @@ class Tilt2048ViewModel(
     }
 
     private fun detectShake(sample: TiltSample) {
-        if (!gameEngine.getState().isGameOver) return
+        // if (!gameEngine.getState().isGameOver) return
 
-        val magnitude = hypot(sample.x.toDouble(), sample.y.toDouble()).toFloat()
-        shakeHistory.addLast(magnitude)
-        if (shakeHistory.size > 5) shakeHistory.removeFirst()
+        // val magnitude = hypot(sample.x.toDouble(), sample.y.toDouble()).toFloat()
+        // shakeHistory.addLast(magnitude)
+        // if (shakeHistory.size > 5) shakeHistory.removeFirst()
 
-        val now = sample.timestampMillis
-        if (now - lastShakeTime < SHAKE_COOLDOWN_MS) return
+        // val now = sample.timestampMillis
+        // if (now - lastShakeTime < SHAKE_COOLDOWN_MS) return
 
-        val avg = shakeHistory.average().toFloat()
-        if (avg > SHAKE_THRESHOLD) {
-            lastShakeTime = now
-            shakeHistory.clear()
-            viewModelScope.launch { startGame(currentMode) }
-        }
+        // val avg = shakeHistory.average().toFloat()
+        // if (avg > SHAKE_THRESHOLD) {
+        //     lastShakeTime = now
+        //     shakeHistory.clear()
+        //     viewModelScope.launch { startGame(currentMode) }
+        // }
     }
     private suspend fun loadDailySeed(challengeDate: String): Long {
         return try {
@@ -398,7 +404,8 @@ class Tilt2048ViewModel(
         if (!force && dailyUploadHandledForSession) {
             return
         }
-        if (!force && !gameEngine.getState().isGameOver) {
+        val engineState = gameEngine.getState()
+        if (!force && !engineState.isGameOver && !engineState.hasWon) {
             return
         }
 
