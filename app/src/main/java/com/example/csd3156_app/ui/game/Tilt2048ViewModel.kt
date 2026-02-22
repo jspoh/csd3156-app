@@ -70,6 +70,7 @@ class Tilt2048ViewModel(
     private var currentDailyDate: String? = savedStateHandle.get(KEY_DAILY_DATE)
     private var currentDailySeed: Long? = savedStateHandle.get(KEY_DAILY_SEED)
     private var dailyUploadHandledForSession: Boolean = false
+    private var playerName: String = DEFAULT_PLAYER_NAME
 
     init {
         val restored = restoreFromSavedState()
@@ -86,6 +87,10 @@ class Tilt2048ViewModel(
             hydrateFromDatabase(hasSavedState = restored != null)
         }
         startAutoSaveLoop()
+    }
+
+    fun setPlayerName(name: String) {
+        playerName = name.trim().ifBlank { DEFAULT_PLAYER_NAME }
     }
 
     fun onSwipe(direction: Direction) {
@@ -398,7 +403,7 @@ class Tilt2048ViewModel(
             challengeDate = challengeDate,
             seed = seed,
             score = score,
-            playerName = DEFAULT_PLAYER_NAME
+            playerName = playerName
         )
 
         _uiState.update { it.copy(isSubmittingDailyScore = true) }

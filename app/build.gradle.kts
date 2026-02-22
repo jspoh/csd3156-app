@@ -18,7 +18,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-        buildConfigField("String", "LEADERBOARD_BASE_URL", "\"\"")
+        buildConfigField("String", "LEADERBOARD_BASE_URL", "\"http://10.0.2.2:3156\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

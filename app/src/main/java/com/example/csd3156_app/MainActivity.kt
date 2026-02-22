@@ -32,7 +32,10 @@ class MainActivity : ComponentActivity() {
                 NavHost(navController = navController, startDestination = "menu") {
                     composable("menu") {
                         MenuScreen(
-                            onStartGame = { navController.navigate("game") },
+                            onStartGame = { username ->
+                                viewModel.setPlayerName(username)
+                                navController.navigate("game")
+                            },
                             onSettings = { navController.navigate("settings") }
                         )
                     }

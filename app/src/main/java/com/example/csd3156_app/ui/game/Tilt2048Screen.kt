@@ -10,8 +10,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -292,9 +290,88 @@ fun TileCell(value: Int, modifier: Modifier = Modifier) {
 
 @Composable
 fun DailyLeaderboardSection(uiState: Tilt2048UiState, onSubmit: () -> Unit, onRefresh: () -> Unit) {
-    // Implement your leaderboard UI here
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Button(onClick = onSubmit, modifier = Modifier.fillMaxWidth()) { Text("Submit Daily Score") }
-        Button(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) { Text("Refresh Leaderboard") }
+    var showModal by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (uiState.networkMessage.isNotBlank()) {
+            Text(
+                text = uiState.networkMessage,
+                fontSize = 12.sp,
+                color = Color.Gray,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onSubmit,
+                enabled = !uiState.isSubmittingDailyScore,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(if (uiState.isSubmittingDailyScore) "Submitting..." else "Submit Score")
+            }
+            Button(
+                onClick = { onRefresh(); showModal = true },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Leaderboard")
+            }
+        }
+    }
+
+    if (showModal) {
+        AlertDialog(
+            onDismissRequest = { showModal = false },
+            title = {
+                Text("Daily Leaderboard", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = uiState.dailyDate,
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    if (uiState.leaderboardLoading) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    } else if (uiState.leaderboard.isEmpty()) {
+                        Text(
+                            text = "No scores yet for today.",
+                            color = Color.Gray,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+                    } else {
+                        uiState.leaderboard.forEachIndexed { index, entry ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "#${index + 1}  ${entry.playerName}",
+                                    fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal
+                                )
+                                Text(
+                                    text = entry.score.toString(),
+                                    fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (index == 0) Color(0xFFEDC22E) else Color.Unspecified
+                                )
+                            }
+                            if (index < uiState.leaderboard.lastIndex) {
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onRefresh() }) { Text("Refresh") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showModal = false }) { Text("Close") }
+            }
+        )
     }
 }
