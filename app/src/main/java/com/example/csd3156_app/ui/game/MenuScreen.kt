@@ -16,9 +16,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 @Composable
 fun MenuScreen(onStartGame: () -> Unit, onSettings: () -> Unit) {
+    // For vibration
+    val haptic = LocalHapticFeedback.current
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -29,13 +34,22 @@ fun MenuScreen(onStartGame: () -> Unit, onSettings: () -> Unit) {
         Text("2048 TILT", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(48.dp))
 
-        Button(onClick = onStartGame, modifier = Modifier
+        Button(
+            onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onStartGame()
+        },
+            modifier = Modifier
             .fillMaxWidth()
             .height(60.dp)) {
             Text("PLAY GAME")
         }
         Spacer(modifier = Modifier.height(16.dp))
-        OutlinedButton(onClick = onSettings, modifier = Modifier
+        OutlinedButton(
+            onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onSettings()
+        }, modifier = Modifier
             .fillMaxWidth()
             .height(60.dp)) {
             Text("SETTINGS")

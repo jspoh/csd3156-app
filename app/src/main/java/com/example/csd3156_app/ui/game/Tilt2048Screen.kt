@@ -103,6 +103,9 @@ fun Tilt2048Screen(
     onRefreshLeaderboard: () -> Unit,
     onSubmitDailyScore: () -> Unit
 ) {
+    // For vibration
+    val haptic = LocalHapticFeedback.current
+
     var dragDelta by remember { mutableStateOf(Offset.Zero) }
     val scrollState = rememberScrollState()
 
@@ -125,13 +128,23 @@ fun Tilt2048Screen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Button(onClick = onBackToMenu) { Text("Menu") }
+                Button(
+                    onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onBackToMenu()
+                }
+                ) { Text("Menu") }
                 Text(
                     text = "Score: ${uiState.score}",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
-                Button(onClick = onNewGame) { Text("Reset") }
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onNewGame()
+                    }
+                ) { Text("Reset") }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -142,12 +155,18 @@ fun Tilt2048Screen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
-                    onClick = { onModeSelected(GameMode.CLASSIC) },
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onModeSelected(GameMode.CLASSIC)
+                    },
                     colors = modeButtonColors(uiState.mode == GameMode.CLASSIC),
                     modifier = Modifier.weight(1f)
                 ) { Text("Classic") }
                 Button(
-                    onClick = { onModeSelected(GameMode.DAILY) },
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onModeSelected(GameMode.DAILY)
+                    },
                     colors = modeButtonColors(uiState.mode == GameMode.DAILY),
                     modifier = Modifier.weight(1f)
                 ) { Text("Daily") }
@@ -292,9 +311,20 @@ fun TileCell(value: Int, modifier: Modifier = Modifier) {
 
 @Composable
 fun DailyLeaderboardSection(uiState: Tilt2048UiState, onSubmit: () -> Unit, onRefresh: () -> Unit) {
+    // Vibrate
+    val haptic = LocalHapticFeedback.current
+
     // Implement your leaderboard UI here
     Column(modifier = Modifier.fillMaxWidth()) {
-        Button(onClick = onSubmit, modifier = Modifier.fillMaxWidth()) { Text("Submit Daily Score") }
-        Button(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) { Text("Refresh Leaderboard") }
+        Button(onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onSubmit()
+                         },
+            modifier = Modifier.fillMaxWidth()) { Text("Submit Daily Score") }
+        Button(onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onRefresh()
+                         },
+            modifier = Modifier.fillMaxWidth()) { Text("Refresh Leaderboard") }
     }
 }

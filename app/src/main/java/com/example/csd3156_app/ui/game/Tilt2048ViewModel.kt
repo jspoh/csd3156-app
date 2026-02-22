@@ -283,7 +283,6 @@ class Tilt2048ViewModel(
     }
 
     private fun applyMove(direction: Direction) {
-        Log.d("TAG", "Moved")
         val result = gameEngine.move(direction)
         if (!result.moved) {
             return
@@ -292,7 +291,6 @@ class Tilt2048ViewModel(
         // If score updated (merged)
         if (result.scoreGained > 0){
             _mergeHapticEvents.tryEmit(Unit)
-            Log.d("TAG", "Vibrate")
         }
 
         publishState(

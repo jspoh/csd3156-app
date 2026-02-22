@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 @Composable
 fun SettingsScreen(
@@ -24,6 +26,9 @@ fun SettingsScreen(
     onTiltSensitivityChanged: (Float) -> Unit,
     onBack: () -> Unit
 ) {
+    // For vibration
+    val haptic = LocalHapticFeedback.current
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -36,19 +41,35 @@ fun SettingsScreen(
             Text("Tilt Controls", modifier = Modifier.weight(1f))
             Switch(
                 checked = uiState.tiltControlsEnabled,
-                onCheckedChange = onTiltControlsEnabledChanged
+                onCheckedChange = { enabled ->
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onTiltControlsEnabledChanged(enabled)
+                }
             )
         }
 
         Text("Sensitivity: ${String.format("%.2f", uiState.tiltSensitivity)}")
+//        Slider(
+//            value = uiState.tiltSensitivity,
+//            onValueChange = onTiltSensitivityChanged,
+//            valueRange = 0.5f..5.0f
+//        )
         Slider(
             value = uiState.tiltSensitivity,
             onValueChange = onTiltSensitivityChanged,
+            onValueChangeFinished = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            },
             valueRange = 0.5f..5.0f
         )
 
         Spacer(modifier = Modifier.weight(1f))
-        Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onBack()
+            },
+            modifier = Modifier.fillMaxWidth()) {
             Text("Back to Menu")
         }
     }
