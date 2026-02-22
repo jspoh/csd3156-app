@@ -16,6 +16,7 @@ import com.example.csd3156_app.game.GameEngine
 import com.example.csd3156_app.game.GameMode
 import com.example.csd3156_app.game.GameState
 import com.example.csd3156_app.game.RandomTileSpawner
+import com.example.csd3156_app.game.TileMovement
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -70,6 +71,7 @@ class Tilt2048ViewModel(
     private var currentDailyDate: String? = savedStateHandle.get(KEY_DAILY_DATE)
     private var currentDailySeed: Long? = savedStateHandle.get(KEY_DAILY_SEED)
     private var dailyUploadHandledForSession: Boolean = false
+    private var playerName: String = DEFAULT_PLAYER_NAME
 
     init {
         val restored = restoreFromSavedState()
@@ -86,6 +88,10 @@ class Tilt2048ViewModel(
             hydrateFromDatabase(hasSavedState = restored != null)
         }
         startAutoSaveLoop()
+    }
+
+    fun setPlayerName(name: String) {
+        playerName = name.trim().ifBlank { DEFAULT_PLAYER_NAME }
     }
 
     fun onSwipe(direction: Direction) {
@@ -296,6 +302,7 @@ class Tilt2048ViewModel(
         publishState(
             gameState = result.state,
             mergedIndices = result.mergedIndices,
+            tileMovements = result.tileMovements,
             mode = currentMode,
             dailyDate = currentDailyDate,
             dailySeed = currentDailySeed
@@ -396,7 +403,7 @@ class Tilt2048ViewModel(
             challengeDate = challengeDate,
             seed = seed,
             score = score,
-            playerName = DEFAULT_PLAYER_NAME
+            playerName = playerName
         )
 
         _uiState.update { it.copy(isSubmittingDailyScore = true) }
@@ -531,6 +538,7 @@ class Tilt2048ViewModel(
     private fun publishState(
         gameState: GameState,
         mergedIndices: Set<Int> = emptySet(),
+        tileMovements: List<TileMovement> = emptyList(),
         mode: GameMode,
         dailyDate: String?,
         dailySeed: Long?
@@ -548,17 +556,19 @@ class Tilt2048ViewModel(
             hasWon = gameState.hasWon,
             isGameOver = gameState.isGameOver,
             mergedIndices = mergedIndices,
+            tileMovements = tileMovements,
+            moveKey = if (tileMovements.isNotEmpty()) previous.moveKey + 1 else previous.moveKey,
             mode = mode,
             dailyDate = dailyDate.orEmpty(),
             dailySeed = dailySeed
         )
 
         clearMergeJob?.cancel()
-        if (mergedIndices.isNotEmpty()) {
+        if (mergedIndices.isNotEmpty() || tileMovements.isNotEmpty()) {
             clearMergeJob = viewModelScope.launch {
                 delay(MERGE_ANIMATION_MS)
                 _uiState.update { current ->
-                    current.copy(mergedIndices = emptySet())
+                    current.copy(mergedIndices = emptySet(), tileMovements = emptyList())
                 }
             }
         }
@@ -615,7 +625,7 @@ class Tilt2048ViewModel(
         private const val KEY_MODE = "tilt2048_mode"
         private const val KEY_DAILY_DATE = "tilt2048_daily_date"
         private const val KEY_DAILY_SEED = "tilt2048_daily_seed"
-        private const val MERGE_ANIMATION_MS = 130L
+        private const val MERGE_ANIMATION_MS = 300L
         private const val MOVE_COOLDOWN_MS = 220L
         private const val DEAD_ZONE_BASE = 1.35f
         private const val NEUTRAL_RESET_MULTIPLIER = 0.6f

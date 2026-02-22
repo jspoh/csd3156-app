@@ -1,7 +1,9 @@
 package com.example.csd3156_app.ui.game
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -10,8 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -20,8 +20,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.csd3156_app.game.TileMovement
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -185,11 +190,15 @@ fun Tilt2048Screen(
             }
 
             // THE BOARD
-            Box(
+            AnimatedGameBoard(
+                board = uiState.board,
+                tileMovements = uiState.tileMovements,
+                mergedIndices = uiState.mergedIndices,
+                moveKey = uiState.moveKey,
+                gridSize = uiState.gridSize,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .background(color = Color(0xFFBBADA0), shape = RoundedCornerShape(12.dp))
                     .pointerInput(uiState.board) {
                         detectDragGestures(
                             onDrag = { change, dragAmount ->
@@ -207,23 +216,7 @@ fun Tilt2048Screen(
                             }
                         )
                     }
-                    .padding(8.dp)
-            ) {
-                val size = uiState.gridSize
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (r in 0 until size) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            for (c in 0 until size) {
-                                val value = uiState.board[r * size + c]
-                                TileCell(value = value, modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            }
+            )
 
             if (uiState.mode == GameMode.DAILY) {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -274,6 +267,167 @@ fun modeButtonColors(isSelected: Boolean): ButtonColors {
     )
 }
 
+fun tileColor(value: Int): Color = when (value) {
+    0    -> Color(0xFFCDC1B4)
+    2    -> Color(0xFFEEE4DA)
+    4    -> Color(0xFFEDE0C8)
+    8    -> Color(0xFFF2B179)
+    16   -> Color(0xFFF59563)
+    32   -> Color(0xFFF67C5F)
+    64   -> Color(0xFFF65E3B)
+    128  -> Color(0xFFEDCF72)
+    256  -> Color(0xFFEDCC61)
+    512  -> Color(0xFFEDC850)
+    1024 -> Color(0xFFEDC53F)
+    2048 -> Color(0xFFEDC22E)
+    else -> Color(0xFF3C3A32)
+}
+
+@Composable
+fun AnimatedGameBoard(
+    board: List<Int>,
+    tileMovements: List<TileMovement>,
+    mergedIndices: Set<Int>,
+    moveKey: Int,
+    gridSize: Int,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(
+        modifier = modifier
+            .background(Color(0xFFBBADA0), RoundedCornerShape(12.dp))
+            .padding(8.dp)
+    ) {
+        val gap = 8.dp
+        val tileSize = (maxWidth - gap * (gridSize - 1).toFloat()) / gridSize.toFloat()
+
+        fun indexXY(index: Int): Pair<Dp, Dp> {
+            val row = index / gridSize
+            val col = index % gridSize
+            val step = tileSize + gap
+            return (step * col.toFloat()) to (step * row.toFloat())
+        }
+
+        // Empty cell backgrounds
+        for (i in 0 until gridSize * gridSize) {
+            val (x, y) = indexXY(i)
+            Box(
+                Modifier
+                    .size(tileSize)
+                    .offset(x = x, y = y)
+                    .background(Color(0xFFCDC1B4), RoundedCornerShape(4.dp))
+            )
+        }
+
+        if (tileMovements.isEmpty()) {
+            // Static rendering: initial state or after animation has completed
+            for (i in board.indices) {
+                val v = board[i]
+                if (v == 0) continue
+                val (x, y) = indexXY(i)
+                Box(
+                    modifier = Modifier
+                        .size(tileSize)
+                        .offset(x = x, y = y)
+                        .background(tileColor(v), RoundedCornerShape(4.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = v.toString(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = when { v < 100 -> 24.sp; v < 1000 -> 18.sp; else -> 14.sp },
+                        color = if (v <= 4) Color(0xFF776E65) else Color.White
+                    )
+                }
+            }
+        } else {
+            // Animated rendering
+            val destIndices = tileMovements.map { it.toIndex }.toSet()
+
+            // Slide each moved tile from its source to destination
+            tileMovements.forEach { movement ->
+                val v = board[movement.toIndex]
+                val (fromX, fromY) = indexXY(movement.fromIndex)
+                val (toX, toY) = indexXY(movement.toIndex)
+                key(moveKey, movement.fromIndex, movement.toIndex) {
+                    SlidingTile(
+                        value = v,
+                        fromX = fromX, fromY = fromY,
+                        toX = toX, toY = toY,
+                        size = tileSize,
+                        isMerged = movement.toIndex in mergedIndices,
+                        isNew = false
+                    )
+                }
+            }
+
+            // Scale-in any newly spawned tile not covered by movements
+            for (i in board.indices) {
+                if (board[i] != 0 && i !in destIndices) {
+                    val (x, y) = indexXY(i)
+                    key(moveKey, i) {
+                        SlidingTile(
+                            value = board[i],
+                            fromX = x, fromY = y,
+                            toX = x, toY = y,
+                            size = tileSize,
+                            isMerged = false,
+                            isNew = true
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SlidingTile(
+    value: Int,
+    fromX: Dp, fromY: Dp,
+    toX: Dp, toY: Dp,
+    size: Dp,
+    isMerged: Boolean,
+    isNew: Boolean
+) {
+    val x = remember { Animatable(fromX.value) }
+    val y = remember { Animatable(fromY.value) }
+    val scale = remember { Animatable(if (isNew) 0f else 1f) }
+
+    LaunchedEffect(Unit) {
+        launch { x.animateTo(toX.value, tween(durationMillis = 120)) }
+        launch { y.animateTo(toY.value, tween(durationMillis = 120)) }
+        when {
+            isNew -> launch {
+                scale.animateTo(
+                    1f,
+                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh)
+                )
+            }
+            isMerged -> launch {
+                delay(120)
+                scale.animateTo(1.18f, tween(60))
+                scale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .size(size)
+            .offset { IntOffset(x.value.dp.roundToPx(), y.value.dp.roundToPx()) }
+            .graphicsLayer { scaleX = scale.value; scaleY = scale.value }
+            .background(tileColor(value), RoundedCornerShape(4.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = value.toString(),
+            fontWeight = FontWeight.Bold,
+            fontSize = when { value < 100 -> 24.sp; value < 1000 -> 18.sp; else -> 14.sp },
+            color = if (value <= 4) Color(0xFF776E65) else Color.White
+        )
+    }
+}
+
 @Composable
 fun TileCell(value: Int, modifier: Modifier = Modifier) {
     val backgroundColor = when (value) {
@@ -311,20 +465,96 @@ fun TileCell(value: Int, modifier: Modifier = Modifier) {
 
 @Composable
 fun DailyLeaderboardSection(uiState: Tilt2048UiState, onSubmit: () -> Unit, onRefresh: () -> Unit) {
-    // Vibrate
+    var showModal by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
-    // Implement your leaderboard UI here
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Button(onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            onSubmit()
-                         },
-            modifier = Modifier.fillMaxWidth()) { Text("Submit Daily Score") }
-        Button(onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            onRefresh()
-                         },
-            modifier = Modifier.fillMaxWidth()) { Text("Refresh Leaderboard") }
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (uiState.networkMessage.isNotBlank()) {
+            Text(
+                text = uiState.networkMessage,
+                fontSize = 12.sp,
+                color = Color.Gray,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onSubmit()
+                },
+                enabled = !uiState.isSubmittingDailyScore,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(if (uiState.isSubmittingDailyScore) "Submitting..." else "Submit Score")
+            }
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onRefresh()
+                    showModal = true
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Leaderboard")
+            }
+        }
+    }
+
+    if (showModal) {
+        AlertDialog(
+            onDismissRequest = { showModal = false },
+            title = {
+                Text("Daily Leaderboard", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = uiState.dailyDate,
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    if (uiState.leaderboardLoading) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    } else if (uiState.leaderboard.isEmpty()) {
+                        Text(
+                            text = "No scores yet for today.",
+                            color = Color.Gray,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+                    } else {
+                        uiState.leaderboard.forEachIndexed { index, entry ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "#${index + 1}  ${entry.playerName}",
+                                    fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal
+                                )
+                                Text(
+                                    text = entry.score.toString(),
+                                    fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (index == 0) Color(0xFFEDC22E) else Color.Unspecified
+                                )
+                            }
+                            if (index < uiState.leaderboard.lastIndex) {
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onRefresh() }) { Text("Refresh") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showModal = false }) { Text("Close") }
+            }
+        )
     }
 }
