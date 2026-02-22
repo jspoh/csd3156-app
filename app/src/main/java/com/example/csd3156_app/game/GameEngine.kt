@@ -16,11 +16,17 @@ data class GameState(
     val hasWon: Boolean
 )
 
+data class TileMovement(
+    val fromIndex: Int,
+    val toIndex: Int
+)
+
 data class MoveResult(
     val state: GameState,
     val moved: Boolean,
     val scoreGained: Int,
-    val mergedIndices: Set<Int> = emptySet()
+    val mergedIndices: Set<Int> = emptySet(),
+    val tileMovements: List<TileMovement> = emptyList()
 )
 
 data class TileSpawn(
@@ -98,26 +104,29 @@ class GameEngine(
         val before = board.copyOf()
         var gainedScore = 0
         val mergedIndices = mutableSetOf<Int>()
+        val allMovements = mutableListOf<TileMovement>()
 
         for (lineIndex in 0 until size) {
             val line = readLine(lineIndex, direction)
             val mergeResult = mergeLine(line)
-            val movedLine = mergeResult.values
-            val gained = mergeResult.scoreGained
-            writeLine(lineIndex, direction, movedLine)
-            gainedScore += gained
+            writeLine(lineIndex, direction, mergeResult.values)
+            gainedScore += mergeResult.scoreGained
             mergeResult.mergedOffsets.forEach { offset ->
                 mergedIndices.add(toBoardIndex(lineIndex, offset, direction))
+            }
+            mergeResult.movements.forEach { (fromOffset, toOffset) ->
+                allMovements.add(
+                    TileMovement(
+                        fromIndex = toBoardIndex(lineIndex, fromOffset, direction),
+                        toIndex = toBoardIndex(lineIndex, toOffset, direction)
+                    )
+                )
             }
         }
 
         val moved = !before.contentEquals(board)
         if (!moved) {
-            return MoveResult(
-                state = currentState(),
-                moved = false,
-                scoreGained = 0
-            )
+            return MoveResult(state = currentState(), moved = false, scoreGained = 0)
         }
 
         score += gainedScore
@@ -127,7 +136,8 @@ class GameEngine(
             state = currentState(),
             moved = true,
             scoreGained = gainedScore,
-            mergedIndices = mergedIndices
+            mergedIndices = mergedIndices,
+            tileMovements = allMovements
         )
     }
 
@@ -153,23 +163,34 @@ class GameEngine(
     }
 
     private fun mergeLine(values: IntArray): MergeLineResult {
-        val nonZero = values.filter { it != 0 }
+        // Track (originalOffset, value) for non-zero tiles to map source → destination
+        val nonZero = mutableListOf<Pair<Int, Int>>()
+        for (i in values.indices) {
+            if (values[i] != 0) nonZero.add(i to values[i])
+        }
+
         val merged = mutableListOf<Int>()
         val mergedOffsets = mutableSetOf<Int>()
+        val movements = mutableListOf<Pair<Int, Int>>() // fromOffset -> toOffset
         var scoreGained = 0
         var index = 0
 
         while (index < nonZero.size) {
-            val current = nonZero[index]
-            val next = nonZero.getOrNull(index + 1)
-            if (next != null && current == next) {
+            val (srcOffset, current) = nonZero[index]
+            val nextPair = nonZero.getOrNull(index + 1)
+            if (nextPair != null && current == nextPair.second) {
                 val mergedValue = current * 2
-                mergedOffsets.add(merged.size)
+                val destOffset = merged.size
+                mergedOffsets.add(destOffset)
                 merged.add(mergedValue)
                 scoreGained += mergedValue
+                movements.add(srcOffset to destOffset)
+                movements.add(nextPair.first to destOffset)
                 index += 2
             } else {
+                val destOffset = merged.size
                 merged.add(current)
+                movements.add(srcOffset to destOffset)
                 index += 1
             }
         }
@@ -181,7 +202,8 @@ class GameEngine(
         return MergeLineResult(
             values = merged.toIntArray(),
             scoreGained = scoreGained,
-            mergedOffsets = mergedOffsets
+            mergedOffsets = mergedOffsets,
+            movements = movements
         )
     }
 
@@ -266,6 +288,7 @@ class GameEngine(
     private data class MergeLineResult(
         val values: IntArray,
         val scoreGained: Int,
-        val mergedOffsets: Set<Int>
+        val mergedOffsets: Set<Int>,
+        val movements: List<Pair<Int, Int>> = emptyList()
     )
 }

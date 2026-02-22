@@ -2,6 +2,7 @@ package com.example.csd3156_app.ui.game
 
 import com.example.csd3156_app.data.LeaderboardEntry
 import com.example.csd3156_app.game.GameMode
+import com.example.csd3156_app.game.TileMovement
 
 data class Tilt2048UiState(
     val board: List<Int> = List(16) { 0 },
@@ -11,6 +12,8 @@ data class Tilt2048UiState(
     val isGameOver: Boolean = false,
     val shakeToResetEnabled: Boolean = true,
     val mergedIndices: Set<Int> = emptySet(),
+    val tileMovements: List<TileMovement> = emptyList(),
+    val moveKey: Int = 0,
     val tiltControlsEnabled: Boolean = false,
     val tiltSensitivity: Float = 1f,
     val tiltDebugDirection: String = "NEUTRAL",
