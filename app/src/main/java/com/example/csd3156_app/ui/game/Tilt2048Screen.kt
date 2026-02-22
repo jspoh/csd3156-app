@@ -31,12 +31,22 @@ import com.example.csd3156_app.game.Direction
 import com.example.csd3156_app.game.GameMode
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.abs
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 
 @Composable
 fun Tilt2048Route(
     viewModel: Tilt2048ViewModel = viewModel(),
     onBackToMenu: () -> Unit
 ) {
+    // For vibration
+    val haptic = LocalHapticFeedback.current
+    LaunchedEffect(Unit) {
+        viewModel.mergeHapticEvents.collectLatest {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val tiltSensorDataSource = remember(context) {

@@ -18,9 +18,11 @@ import com.example.csd3156_app.game.GameState
 import com.example.csd3156_app.game.RandomTileSpawner
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -31,11 +33,14 @@ import java.util.TimeZone
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.random.Random
+import android.util.Log
 
 class Tilt2048ViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle
 ) : AndroidViewModel(application) {
+    private val _mergeHapticEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val mergeHapticEvents = _mergeHapticEvents.asSharedFlow()
 
     private val gameEngine = GameEngine()
     private val repository: GameRepository = RoomGameRepository(
@@ -278,10 +283,18 @@ class Tilt2048ViewModel(
     }
 
     private fun applyMove(direction: Direction) {
+        Log.d("TAG", "Moved")
         val result = gameEngine.move(direction)
         if (!result.moved) {
             return
         }
+
+        // If score updated (merged)
+        if (result.scoreGained > 0){
+            _mergeHapticEvents.tryEmit(Unit)
+            Log.d("TAG", "Vibrate")
+        }
+
         publishState(
             gameState = result.state,
             mergedIndices = result.mergedIndices,
