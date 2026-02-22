@@ -47,12 +47,16 @@ class Tilt2048ViewModel(
 
     private var clearMergeJob: Job? = null
     private var autoSaveJob: Job? = null
+    // Tilt Sensors
     private var neutralX: Float = 0f
     private var neutralY: Float = 0f
     private var latestX: Float = 0f
     private var latestY: Float = 0f
     private var waitingForNeutral: Boolean = false
     private var lastMoveAtMillis: Long = 0L
+    // Shake Sensor
+    private var lastShakeTime: Long = 0L
+    private val shakeHistory = ArrayDeque<Float>()
     private var currentSessionId: Long? = savedStateHandle.get(KEY_SESSION_ID)
     private var isCurrentSessionFinished: Boolean = false
     private var currentMode: GameMode = savedStateHandle.get<String>(KEY_MODE)
@@ -149,6 +153,8 @@ class Tilt2048ViewModel(
     fun onTiltSample(sample: TiltSample) {
         latestX = sample.x
         latestY = sample.y
+
+        detectShake(sample)
 
         val currentState = _uiState.value
         val deltaX = sample.x - neutralX
@@ -303,6 +309,23 @@ class Tilt2048ViewModel(
         }
     }
 
+    private fun detectShake(sample: TiltSample) {
+        if (!gameEngine.getState().isGameOver) return
+
+        val magnitude = hypot(sample.x.toDouble(), sample.y.toDouble()).toFloat()
+        shakeHistory.addLast(magnitude)
+        if (shakeHistory.size > 5) shakeHistory.removeFirst()
+
+        val now = sample.timestampMillis
+        if (now - lastShakeTime < SHAKE_COOLDOWN_MS) return
+
+        val avg = shakeHistory.average().toFloat()
+        if (avg > SHAKE_THRESHOLD) {
+            lastShakeTime = now
+            shakeHistory.clear()
+            viewModelScope.launch { startGame(currentMode) }
+        }
+    }
     private suspend fun loadDailySeed(challengeDate: String): Long {
         return try {
             val seed = repository.getOrFetchDailySeed(challengeDate)
@@ -587,6 +610,8 @@ class Tilt2048ViewModel(
         private const val NEUTRAL_RESET_MULTIPLIER = 0.6f
         private const val DEBUG_NEUTRAL_THRESHOLD = 0.35f
         private const val AUTO_SAVE_INTERVAL_MS = 5_000L
+        private const val SHAKE_THRESHOLD = 8f
+        private const val SHAKE_COOLDOWN_MS = 2000L
         private const val LEADERBOARD_LIMIT = 10
         private const val DEFAULT_PLAYER_NAME = "Player"
         const val MIN_SENSITIVITY = 0.6f
