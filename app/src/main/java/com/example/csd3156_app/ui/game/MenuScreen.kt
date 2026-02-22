@@ -57,7 +57,7 @@ fun MenuScreen(onStartGame: (String) -> Unit, onSettings: () -> Unit) {
         Button(
             onClick = {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            onStartGame()
+            showDialog = true
         },
             modifier = Modifier
             .fillMaxWidth()
