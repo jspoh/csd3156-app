@@ -1,5 +1,6 @@
 package com.example.csd3156_app.ui.game
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -41,6 +42,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.abs
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.zIndex
 
 @Composable
 fun Tilt2048Route(
@@ -203,6 +205,8 @@ fun Tilt2048Screen(
                 mergedIndices = uiState.mergedIndices,
                 moveKey = uiState.moveKey,
                 gridSize = uiState.gridSize,
+                tiltDirection = uiState.tiltDebugDirection,
+                tiltMagnitude = uiState.tiltDebugMagnitude,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
@@ -232,35 +236,35 @@ fun Tilt2048Screen(
 
             // DEBUG TILT INFO
 
-            if (uiState.tiltSensorAvailable) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0x22000000), RoundedCornerShape(8.dp))
-                        .padding(8.dp)
-                ) {
-                    Text(
-                        text = "Sensor: ${uiState.tiltSensorLabel}",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                    Text(
-                        text = "Direction: ${uiState.tiltDebugDirection}",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                    Text(
-                        text = "Magnitude: ${"%.2f".format(uiState.tiltDebugMagnitude)}",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                    Text(
-                        text = "Tilt enabled: ${uiState.tiltControlsEnabled}",
-                        fontSize = 12.sp,
-                        color = if (uiState.tiltControlsEnabled) Color(0xFF2E7D32) else Color(0xFFB71C1C)
-                    )
-                }
-            }
+//            if (uiState.tiltSensorAvailable) {
+//                Column(
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .background(Color(0x22000000), RoundedCornerShape(8.dp))
+//                        .padding(8.dp)
+//                ) {
+//                    Text(
+//                        text = "Sensor: ${uiState.tiltSensorLabel}",
+//                        fontSize = 12.sp,
+//                        color = Color.Gray
+//                    )
+//                    Text(
+//                        text = "Direction: ${uiState.tiltDebugDirection}",
+//                        fontSize = 12.sp,
+//                        color = Color.Gray
+//                    )
+//                    Text(
+//                        text = "Magnitude: ${"%.2f".format(uiState.tiltDebugMagnitude)}",
+//                        fontSize = 12.sp,
+//                        color = Color.Gray
+//                    )
+//                    Text(
+//                        text = "Tilt enabled: ${uiState.tiltControlsEnabled}",
+//                        fontSize = 12.sp,
+//                        color = if (uiState.tiltControlsEnabled) Color(0xFF2E7D32) else Color(0xFFB71C1C)
+//                    )
+//                }
+//            }
         }
 
         // Game result overlay — shown on top of the board
@@ -415,6 +419,7 @@ fun tileColor(value: Int): Color = when (value) {
     else -> Color(0xFF3C3A32)
 }
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun AnimatedGameBoard(
     board: List<Int>,
@@ -422,95 +427,151 @@ fun AnimatedGameBoard(
     mergedIndices: Set<Int>,
     moveKey: Int,
     gridSize: Int,
+    tiltDirection: String,
+    tiltMagnitude: Float,
     modifier: Modifier = Modifier
 ) {
+    // ROOT CONTAINER
     BoxWithConstraints(
         modifier = modifier
-            .background(Color(0xFFBBADA0), RoundedCornerShape(12.dp))
-            .padding(8.dp)
     ) {
+        val boardSizeDp = maxWidth
+        val padding = 8.dp
         val gap = 8.dp
-        val tileSize = (maxWidth - gap * (gridSize - 1).toFloat()) / gridSize.toFloat()
 
-        fun indexXY(index: Int): Pair<Dp, Dp> {
-            val row = index / gridSize
-            val col = index % gridSize
-            val step = tileSize + gap
-            return (step * col.toFloat()) to (step * row.toFloat())
+        // Exact tile size calculation: Total width minus padding on both sides,
+        // minus all gaps, divided by the number of tiles per row.
+        val tileSize = (boardSizeDp - (padding * 2) - gap * (gridSize - 1).toFloat()) / gridSize.toFloat()
+
+        // SMOOTH ANIMATED SHADOW LAYER
+        // Calculate target offsets
+        val targetOffsetX = when {
+            tiltDirection.contains("left", ignoreCase = true) -> -20.dp
+            tiltDirection.contains("right", ignoreCase = true) -> 20.dp
+            else -> 0.dp
+        }
+        val targetOffsetY = when {
+            tiltDirection.contains("up", ignoreCase = true) -> -20.dp
+            tiltDirection.contains("down", ignoreCase = true) -> 20.dp
+            else -> 0.dp
         }
 
-        // Empty cell backgrounds
-        for (i in 0 until gridSize * gridSize) {
-            val (x, y) = indexXY(i)
-            Box(
-                Modifier
-                    .size(tileSize)
-                    .offset(x = x, y = y)
-                    .background(Color(0xFFCDC1B4), RoundedCornerShape(4.dp))
-            )
-        }
+        // Animate the offset for smooth gliding
+        val animatedOffsetX by androidx.compose.animation.core.animateDpAsState(
+            targetValue = targetOffsetX * tiltMagnitude.coerceAtMost(1.5f),
+            animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessLow)
+        )
+        val animatedOffsetY by androidx.compose.animation.core.animateDpAsState(
+            targetValue = targetOffsetY * tiltMagnitude.coerceAtMost(1.5f),
+            animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessLow)
+        )
 
-        if (tileMovements.isEmpty()) {
-            // Static rendering: initial state or after animation has completed
-            for (i in board.indices) {
-                val v = board[i]
-                if (v == 0) continue
+        val shadowAlpha = (tiltMagnitude * 0.4f).coerceIn(0f, 0.3f)
+
+        Box(
+            modifier = Modifier
+                .size(boardSizeDp)
+                .offset { IntOffset(animatedOffsetX.roundToPx(), animatedOffsetY.roundToPx()) }
+                .background(
+                    Color.Black.copy(alpha = shadowAlpha),
+                    RoundedCornerShape(12.dp)
+                )
+        )
+
+
+        // MAIN BOARD BACKGROUND
+        Box(
+            modifier = Modifier
+                .size(boardSizeDp)
+                .background(Color(0xFFBBADA0), RoundedCornerShape(12.dp))
+        )
+
+        // TILES CONTAINER
+        Box(
+            modifier = Modifier
+                .size(boardSizeDp)
+                .padding(padding) // Sets coordinate (0,0) inside the board bounds
+        ) {
+            fun indexXY(index: Int): Pair<Dp, Dp> {
+                val row = index / gridSize
+                val col = index % gridSize
+                val step = tileSize + gap
+                return (step * col.toFloat()) to (step * row.toFloat())
+            }
+
+            // Empty cell backgrounds
+            for (i in 0 until gridSize * gridSize) {
                 val (x, y) = indexXY(i)
                 Box(
-                    modifier = Modifier
+                    Modifier
                         .size(tileSize)
                         .offset(x = x, y = y)
-                        .background(tileColor(v), RoundedCornerShape(4.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = v.toString(),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = when { v < 100 -> 24.sp; v < 1000 -> 18.sp; else -> 14.sp },
-                        color = if (v <= 4) Color(0xFF776E65) else Color.White
-                    )
-                }
-            }
-        } else {
-            // Animated rendering
-            val destIndices = tileMovements.map { it.toIndex }.toSet()
-
-            // Slide each moved tile from its source to destination
-            tileMovements.forEach { movement ->
-                val v = board[movement.toIndex]
-                val (fromX, fromY) = indexXY(movement.fromIndex)
-                val (toX, toY) = indexXY(movement.toIndex)
-                key(moveKey, movement.fromIndex, movement.toIndex) {
-                    SlidingTile(
-                        value = v,
-                        fromX = fromX, fromY = fromY,
-                        toX = toX, toY = toY,
-                        size = tileSize,
-                        isMerged = movement.toIndex in mergedIndices,
-                        isNew = false
-                    )
-                }
+                        .background(Color(0xFFCDC1B4), RoundedCornerShape(4.dp))
+                )
             }
 
-            // Scale-in any newly spawned tile not covered by movements
-            for (i in board.indices) {
-                if (board[i] != 0 && i !in destIndices) {
+            if (tileMovements.isEmpty()) {
+                // Static tiles
+                for (i in board.indices) {
+                    val v = board[i]
+                    if (v == 0) continue
                     val (x, y) = indexXY(i)
-                    key(moveKey, i) {
-                        SlidingTile(
-                            value = board[i],
-                            fromX = x, fromY = y,
-                            toX = x, toY = y,
-                            size = tileSize,
-                            isMerged = false,
-                            isNew = true
+                    Box(
+                        modifier = Modifier
+                            .size(tileSize)
+                            .offset(x = x, y = y)
+                            .background(tileColor(v), RoundedCornerShape(4.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = v.toString(),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = when { v < 100 -> 24.sp; v < 1000 -> 18.sp; else -> 14.sp },
+                            color = if (v <= 4) Color(0xFF776E65) else Color.White
                         )
+                    }
+                }
+            } else {
+                // Animated tiles
+                val destIndices = tileMovements.map { it.toIndex }.toSet()
+
+                tileMovements.forEach { movement ->
+                    val v = board[movement.toIndex]
+                    val (fromX, fromY) = indexXY(movement.fromIndex)
+                    val (toX, toY) = indexXY(movement.toIndex)
+                    key(moveKey, movement.fromIndex, movement.toIndex) {
+                        SlidingTile(
+                            value = v,
+                            fromX = fromX, fromY = fromY,
+                            toX = toX, toY = toY,
+                            size = tileSize,
+                            isMerged = movement.toIndex in mergedIndices,
+                            isNew = false
+                        )
+                    }
+                }
+
+                // New tiles
+                for (i in board.indices) {
+                    if (board[i] != 0 && i !in destIndices) {
+                        val (x, y) = indexXY(i)
+                        key(moveKey, i) {
+                            SlidingTile(
+                                value = board[i],
+                                fromX = x, fromY = y,
+                                toX = x, toY = y,
+                                size = tileSize,
+                                isMerged = false,
+                                isNew = true
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
 
 @Composable
 fun SlidingTile(
