@@ -20,8 +20,8 @@ class RestDailyLeaderboardApi(
         ignoreUnknownKeys = true
     }
 
-    override suspend fun fetchDailySeed(date: String): DailySeedResponse = withContext(Dispatchers.IO) {
-        val url = "$baseUrl/daily-seed?date=${date.urlEncoded()}"
+    override suspend fun fetchDailySeed(): DailySeedResponse = withContext(Dispatchers.IO) {
+        val url = "$baseUrl/daily-seed"
         val response = request(url = url, method = "GET", body = null)
         val payload = json.decodeFromString(DailySeedPayload.serializer(), response)
         DailySeedResponse(date = payload.date, seed = payload.seed)
@@ -59,7 +59,7 @@ class RestDailyLeaderboardApi(
             )
         )
         request(
-            url = "$baseUrl/leaderboard/submit",
+            url = "$baseUrl/leaderboard",
             method = "POST",
             body = requestBody
         )

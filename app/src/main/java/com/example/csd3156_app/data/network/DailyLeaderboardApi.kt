@@ -12,7 +12,7 @@ data class LeaderboardEntryDto(
 )
 
 interface DailyLeaderboardApi {
-    suspend fun fetchDailySeed(date: String): DailySeedResponse
+    suspend fun fetchDailySeed(): DailySeedResponse
 
     suspend fun fetchLeaderboard(date: String, limit: Int): List<LeaderboardEntryDto>
 

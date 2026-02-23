@@ -21,7 +21,9 @@ If this value is empty, the app still runs:
 
 All responses are JSON.
 
-### `GET /daily-seed?date=YYYY-MM-DD`
+### `GET /daily-seed`
+
+Returns the seed for today's challenge. The date is determined server-side.
 
 Response:
 
@@ -45,7 +47,7 @@ Response:
 }
 ```
 
-### `POST /leaderboard/submit`
+### `POST /leaderboard`
 
 Request:
 
@@ -58,7 +60,9 @@ Request:
 }
 ```
 
-Response: `200-299` with any JSON body (or empty body).
+The server validates that `seed` matches the expected seed for the given `date`. Mismatched seeds are rejected with `400`.
+
+Response: `200` with any JSON body (or empty body).
 
 ## 3) Reliability Behavior in App
 

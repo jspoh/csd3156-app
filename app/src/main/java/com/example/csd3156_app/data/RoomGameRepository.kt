@@ -149,7 +149,7 @@ class RoomGameRepository(
             return cached.seed
         }
 
-        val response = requireDailyApi().fetchDailySeed(challengeDate)
+        val response = requireDailyApi().fetchDailySeed()
         database.dailyChallengeDao().upsertDailySeed(
             DailySeedCacheEntity(
                 challengeDate = response.date,

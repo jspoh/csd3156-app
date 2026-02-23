@@ -39,13 +39,17 @@ def status():
 @app.route("/daily-seed")
 def get_seed():
     # print("get_seed")
-    date_str = request.args.get("date")
-    if not date_str:
-        date_str = datetime.date.today().isoformat()
+    date_str = datetime.date.today().isoformat()
     return jsonify({"date": date_str, "seed": seed_for_date(date_str)})
 
 
-@app.route("/leaderboard")
+@app.route("/leaderboard", methods=["GET", "POST"])
+def leaderboard_route():
+    if request.method == "GET":
+        return get_leaderboard()
+    return submit_score()
+
+
 def get_leaderboard():
     # print("get_leaderboard")
     date_str = request.args.get("date")
@@ -58,17 +62,20 @@ def get_leaderboard():
     return jsonify({"entries": sorted_entries[:limit]})
 
 
-@app.route("/leaderboard/submit", methods=["POST"])
 def submit_score():
     # print("submit_score")
     data = request.get_json(force=True)
 
     date_str = data.get("date")
+    seed = data.get("seed")
     score = data.get("score")
     player_name = data.get("playerName", "Player")
 
-    if not date_str or score is None:
+    if not date_str or seed is None or score is None:
         return jsonify({"error": "Missing required fields"}), 400
+
+    if seed != seed_for_date(date_str):
+        return jsonify({"error": "Malformed request"}), 400
 
     if date_str not in leaderboard:
         leaderboard[date_str] = []
