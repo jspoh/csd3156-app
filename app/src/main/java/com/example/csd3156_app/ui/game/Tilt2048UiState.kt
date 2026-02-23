@@ -7,10 +7,11 @@ import com.example.csd3156_app.game.TileMovement
 data class Tilt2048UiState(
     val board: List<Int> = List(16) { 0 },
     val score: Int = 0,
+    val highestScore: Int = 0,
     val gridSize: Int = 4,
     val hasWon: Boolean = false,
     val isGameOver: Boolean = false,
-    val shakeToResetEnabled: Boolean = true,
+    val shakeToResetEnabled: Boolean = false,
     val mergedIndices: Set<Int> = emptySet(),
     val tileMovements: List<TileMovement> = emptyList(),
     val moveKey: Int = 0,

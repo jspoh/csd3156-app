@@ -112,7 +112,14 @@ fun Tilt2048Screen(
     val haptic = LocalHapticFeedback.current
 
     var dragDelta by remember { mutableStateOf(Offset.Zero) }
+    var showGameOverDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+
+    LaunchedEffect(uiState.isGameOver) {
+        if (uiState.isGameOver) {
+            showGameOverDialog = true
+        }
+    }
 
     // Centering Container
     Box(
@@ -139,11 +146,18 @@ fun Tilt2048Screen(
                     onBackToMenu()
                 }
                 ) { Text("Menu") }
-                Text(
-                    text = "Score: ${uiState.score}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Score: ${uiState.score}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Best: ${maxOf(uiState.highestScore, uiState.score)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF6D4C41)
+                    )
+                }
                 Button(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -180,11 +194,11 @@ fun Tilt2048Screen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // GAME MESSAGES
-            if (uiState.hasWon || uiState.isGameOver) {
+            if (uiState.hasWon) {
                 Text(
-                    text = if (uiState.hasWon) "Victory! 2048!" else "Game Over — shake to reset!",
+                    text = "Victory! 2048!",
                     style = MaterialTheme.typography.headlineSmall,
-                    color = if (uiState.hasWon) Color(0xFF2E7D32) else Color(0xFFB71C1C),
+                    color = Color(0xFF2E7D32),
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
             }
@@ -253,6 +267,49 @@ fun Tilt2048Screen(
                     )
                 }
             }
+        }
+
+        if (showGameOverDialog && uiState.isGameOver) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = {
+                    Text("Game Over", fontWeight = FontWeight.Bold)
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Your final score: ${uiState.score}")
+                        if (uiState.mode == GameMode.DAILY) {
+                            Text(
+                                text = "Daily Challenge (${uiState.dailyDate})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showGameOverDialog = false
+                            onNewGame()
+                        }
+                    ) {
+                        Text("Restart")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showGameOverDialog = false
+                            onBackToMenu()
+                        }
+                    ) {
+                        Text("Main Menu")
+                    }
+                }
+            )
         }
     }
 }
@@ -558,3 +615,4 @@ fun DailyLeaderboardSection(uiState: Tilt2048UiState, onSubmit: () -> Unit, onRe
         )
     }
 }
+

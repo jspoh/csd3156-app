@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
                         SettingsScreen(
                             uiState = uiState,
                             onTiltControlsEnabledChanged = viewModel::onTiltControlsEnabledChanged,
+                            onShakeToResetEnabledChanged = viewModel::onShakeToResetEnabledChanged,
                             onTiltSensitivityChanged = viewModel::onTiltSensitivityChanged,
                             onBack = { navController.popBackStack() }
                         )

@@ -5,6 +5,7 @@ import com.example.csd3156_app.game.GameMode
 
 data class PersistedSettings(
     val tiltEnabled: Boolean,
+    val shakeToResetEnabled: Boolean,
     val sensitivity: Float,
     val calibrationBaselineX: Float,
     val calibrationBaselineY: Float
@@ -58,6 +59,8 @@ interface GameRepository : AutoCloseable {
     suspend fun markSessionFinished(sessionId: Long, score: Int)
 
     suspend fun addHighScore(score: Int, mode: String)
+
+    suspend fun getHighestScore(): Int
 
     suspend fun addMoveEvent(sessionId: Long, direction: Direction, scoreAfter: Int)
 

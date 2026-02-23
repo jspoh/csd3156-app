@@ -34,7 +34,6 @@ import java.util.TimeZone
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.random.Random
-import android.util.Log
 
 class Tilt2048ViewModel(
     application: Application,
@@ -138,6 +137,13 @@ class Tilt2048ViewModel(
         persistSettings()
     }
 
+    fun onShakeToResetEnabledChanged(enabled: Boolean) {
+        _uiState.update { current ->
+            current.copy(shakeToResetEnabled = enabled)
+        }
+        persistSettings()
+    }
+
     fun onTiltSensitivityChanged(sensitivity: Float) {
         val normalized = sensitivity.coerceIn(MIN_SENSITIVITY, MAX_SENSITIVITY)
         _uiState.update { current ->
@@ -167,7 +173,9 @@ class Tilt2048ViewModel(
         latestX = sample.x
         latestY = sample.y
 
-        detectShake(sample)
+        if (_uiState.value.shakeToResetEnabled) {
+            detectShake(sample)
+        }
 
         val currentState = _uiState.value
         val deltaX = sample.x - neutralX
@@ -217,6 +225,10 @@ class Tilt2048ViewModel(
     private suspend fun hydrateFromDatabase(hasSavedState: Boolean) {
         val settings = repository.loadSettings()
         applyPersistedSettings(settings)
+        val highestScore = repository.getHighestScore()
+        _uiState.update { current ->
+            current.copy(highestScore = highestScore)
+        }
         repository.retryPendingDailyUploads()
 
         if (!hasSavedState) {
@@ -338,13 +350,16 @@ class Tilt2048ViewModel(
 
         val magnitude = hypot(sample.x.toDouble(), sample.y.toDouble()).toFloat()
         shakeHistory.addLast(magnitude)
-        if (shakeHistory.size > 5) shakeHistory.removeFirst()
+        if (shakeHistory.size > SHAKE_WINDOW_SIZE) shakeHistory.removeFirst()
+
+        if (shakeHistory.size < SHAKE_WINDOW_SIZE) return
 
         val now = sample.timestampMillis
         if (now - lastShakeTime < SHAKE_COOLDOWN_MS) return
 
         val avg = shakeHistory.average().toFloat()
-        if (avg > SHAKE_THRESHOLD) {
+        val peak = shakeHistory.maxOrNull() ?: 0f
+        if (avg > SHAKE_THRESHOLD && peak > SHAKE_THRESHOLD * SHAKE_PEAK_MULTIPLIER) {
             lastShakeTime = now
             shakeHistory.clear()
             viewModelScope.launch { startGame(currentMode) }
@@ -453,6 +468,7 @@ class Tilt2048ViewModel(
         _uiState.update { current ->
             current.copy(
                 tiltControlsEnabled = settings.tiltEnabled,
+                shakeToResetEnabled = settings.shakeToResetEnabled,
                 tiltSensitivity = settings.sensitivity.coerceIn(MIN_SENSITIVITY, MAX_SENSITIVITY)
             )
         }
@@ -464,6 +480,7 @@ class Tilt2048ViewModel(
             repository.saveSettings(
                 PersistedSettings(
                     tiltEnabled = state.tiltControlsEnabled,
+                    shakeToResetEnabled = state.shakeToResetEnabled,
                     sensitivity = state.tiltSensitivity,
                     calibrationBaselineX = neutralX,
                     calibrationBaselineY = neutralY
@@ -538,6 +555,9 @@ class Tilt2048ViewModel(
                 score = score,
                 mode = previousMode.name.lowercase()
             )
+            _uiState.update { current ->
+                current.copy(highestScore = maxOf(current.highestScore, score))
+            }
         }
     }
 
@@ -637,7 +657,9 @@ class Tilt2048ViewModel(
         private const val NEUTRAL_RESET_MULTIPLIER = 0.6f
         private const val DEBUG_NEUTRAL_THRESHOLD = 0.35f
         private const val AUTO_SAVE_INTERVAL_MS = 5_000L
-        private const val SHAKE_THRESHOLD = 8f
+        private const val SHAKE_THRESHOLD = 7.5f
+        private const val SHAKE_PEAK_MULTIPLIER = 1.05f
+        private const val SHAKE_WINDOW_SIZE = 8
         private const val SHAKE_COOLDOWN_MS = 2000L
         private const val LEADERBOARD_LIMIT = 10
         private const val DEFAULT_PLAYER_NAME = "Player"
