@@ -29,7 +29,7 @@ import com.example.csd3156_app.data.local.entity.SettingsEntity
         LeaderboardEntryCacheEntity::class,
         PendingScoreUploadEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class Tilt2048Database : RoomDatabase() {
@@ -105,12 +105,26 @@ abstract class Tilt2048Database : RoomDatabase() {
             }
         }
 
+        private val migration2To3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    ALTER TABLE settings
+                    ADD COLUMN shakeToResetEnabled INTEGER NOT NULL DEFAULT 0
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun create(context: Context): Tilt2048Database {
             return Room.databaseBuilder(
                 context,
                 Tilt2048Database::class.java,
                 DATABASE_NAME
-            ).addMigrations(migration1To2)
+            ).addMigrations(
+                migration1To2,
+                migration2To3
+            )
                 .build()
         }
     }

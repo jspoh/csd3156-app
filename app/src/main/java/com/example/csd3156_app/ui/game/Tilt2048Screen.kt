@@ -115,7 +115,14 @@ fun Tilt2048Screen(
     val haptic = LocalHapticFeedback.current
 
     var dragDelta by remember { mutableStateOf(Offset.Zero) }
+    var showGameOverDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+
+    LaunchedEffect(uiState.isGameOver) {
+        if (uiState.isGameOver) {
+            showGameOverDialog = true
+        }
+    }
 
     // Centering Container
     Box(
@@ -142,11 +149,18 @@ fun Tilt2048Screen(
                     onBackToMenu()
                 }
                 ) { Text("Menu") }
-                Text(
-                    text = "Score: ${uiState.score}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Score: ${uiState.score}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Best: ${maxOf(uiState.highestScore, uiState.score)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF6D4C41)
+                    )
+                }
                 Button(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -257,7 +271,8 @@ fun Tilt2048Screen(
             GameResultOverlay(
                 hasWon = uiState.hasWon,
                 score = uiState.score,
-                onNewGame = onNewGame
+                onNewGame = onNewGame,
+                onBackToMenu = onBackToMenu
             )
         }
     }
@@ -270,7 +285,8 @@ fun Tilt2048Screen(
 fun GameResultOverlay(
     hasWon: Boolean,
     score: Int,
-    onNewGame: () -> Unit
+    onNewGame: () -> Unit,
+    onBackToMenu: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val overlayBg = if (hasWon) Color(0xE8F9F1E8) else Color(0xE8201A18)
@@ -327,7 +343,7 @@ fun GameResultOverlay(
                 )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             Button(
                 onClick = {
@@ -344,6 +360,26 @@ fun GameResultOverlay(
             ) {
                 Text(
                     text = if (hasWon) "Play Again" else "Try Again",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            OutlinedButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onBackToMenu()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = btnContainerColor,
+                    contentColor = Color.White
+                ),
+                modifier = Modifier
+                    .fillMaxWidth(0.6f)
+                    .height(52.dp)
+            ) {
+                Text(
+                    text = "Main Menu",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -654,3 +690,4 @@ fun DailyLeaderboardSection(uiState: Tilt2048UiState, onSubmit: () -> Unit, onRe
         )
     }
 }
+

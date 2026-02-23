@@ -27,6 +27,7 @@ class RoomGameRepository(
             val baseline = CalibrationBaselineCodec.decode(existing.calibrationBaseline)
             return PersistedSettings(
                 tiltEnabled = existing.tiltEnabled,
+                shakeToResetEnabled = existing.shakeToResetEnabled,
                 sensitivity = existing.sensitivity,
                 calibrationBaselineX = baseline.first,
                 calibrationBaselineY = baseline.second
@@ -35,6 +36,7 @@ class RoomGameRepository(
 
         val defaults = PersistedSettings(
             tiltEnabled = false,
+            shakeToResetEnabled = false,
             sensitivity = 1f,
             calibrationBaselineX = 0f,
             calibrationBaselineY = 0f
@@ -47,6 +49,7 @@ class RoomGameRepository(
         val entity = SettingsEntity(
             id = SettingsEntity.SETTINGS_SINGLETON_ID,
             tiltEnabled = settings.tiltEnabled,
+            shakeToResetEnabled = settings.shakeToResetEnabled,
             sensitivity = settings.sensitivity,
             calibrationBaseline = CalibrationBaselineCodec.encode(
                 settings.calibrationBaselineX,
@@ -123,6 +126,10 @@ class RoomGameRepository(
                 mode = mode
             )
         )
+    }
+
+    override suspend fun getHighestScore(): Int {
+        return database.highScoreDao().getHighestScore() ?: 0
     }
 
     override suspend fun addMoveEvent(sessionId: Long, direction: Direction, scoreAfter: Int) {

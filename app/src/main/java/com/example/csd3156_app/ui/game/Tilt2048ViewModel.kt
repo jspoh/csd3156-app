@@ -34,12 +34,12 @@ import java.util.TimeZone
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.random.Random
-import android.util.Log
 
 class Tilt2048ViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle
 ) : AndroidViewModel(application) {
+
     private val _mergeHapticEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val mergeHapticEvents = _mergeHapticEvents.asSharedFlow()
 
@@ -48,11 +48,13 @@ class Tilt2048ViewModel(
         database = Tilt2048Database.create(application.applicationContext),
         dailyApi = createDailyApi()
     )
+
     private val _uiState = MutableStateFlow(Tilt2048UiState())
     val uiState: StateFlow<Tilt2048UiState> = _uiState.asStateFlow()
 
     private var clearMergeJob: Job? = null
     private var autoSaveJob: Job? = null
+
     // Tilt Sensors
     private var neutralX: Float = 0f
     private var neutralY: Float = 0f
@@ -61,14 +63,19 @@ class Tilt2048ViewModel(
     private var waitingForNeutral: Boolean = false
     private var lastTiltDirection: Direction? = null
     private var lastMoveAtMillis: Long = 0L
-    // Shake Sensor
+
+    // Shake Sensor (LESS SENSITIVE: jerk-based on x/y changes)
     private var lastShakeTime: Long = 0L
     private val shakeHistory = ArrayDeque<Float>()
+    private var lastShakeMagnitude: Float? = null
+
     private var currentSessionId: Long? = savedStateHandle.get(KEY_SESSION_ID)
     private var isCurrentSessionFinished: Boolean = false
+
     private var currentMode: GameMode = savedStateHandle.get<String>(KEY_MODE)
         ?.let { mode -> runCatching { GameMode.valueOf(mode) }.getOrDefault(GameMode.CLASSIC) }
         ?: GameMode.CLASSIC
+
     private var currentDailyDate: String? = savedStateHandle.get(KEY_DAILY_DATE)
     private var currentDailySeed: Long? = savedStateHandle.get(KEY_DAILY_SEED)
     private var dailyUploadHandledForSession: Boolean = false
@@ -131,9 +138,15 @@ class Tilt2048ViewModel(
     }
 
     fun onTiltControlsEnabledChanged(enabled: Boolean) {
-        // waitingForNeutral = false
         _uiState.update { current ->
             current.copy(tiltControlsEnabled = enabled)
+        }
+        persistSettings()
+    }
+
+    fun onShakeToResetEnabledChanged(enabled: Boolean) {
+        _uiState.update { current ->
+            current.copy(shakeToResetEnabled = enabled)
         }
         persistSettings()
     }
@@ -167,7 +180,9 @@ class Tilt2048ViewModel(
         latestX = sample.x
         latestY = sample.y
 
-        detectShake(sample)
+        if (_uiState.value.shakeToResetEnabled) {
+            detectShake(sample)
+        }
 
         val currentState = _uiState.value
         val deltaX = sample.x - neutralX
@@ -217,6 +232,12 @@ class Tilt2048ViewModel(
     private suspend fun hydrateFromDatabase(hasSavedState: Boolean) {
         val settings = repository.loadSettings()
         applyPersistedSettings(settings)
+
+        val highestScore = repository.getHighestScore()
+        _uiState.update { current ->
+            current.copy(highestScore = highestScore)
+        }
+
         repository.retryPendingDailyUploads()
 
         if (!hasSavedState) {
@@ -228,6 +249,7 @@ class Tilt2048ViewModel(
                 currentMode = unfinished.mode
                 currentDailyDate = unfinished.dailyDate
                 currentDailySeed = unfinished.dailySeed
+
                 publishState(
                     gameState = gameEngine.restoreState(unfinished.board, unfinished.score),
                     mode = currentMode,
@@ -259,6 +281,11 @@ class Tilt2048ViewModel(
         currentMode = mode
         savedStateHandle[KEY_MODE] = mode.name
 
+        // reset shake tracking between sessions
+        shakeHistory.clear()
+        lastShakeMagnitude = null
+        lastShakeTime = 0L
+
         val gameState = if (mode == GameMode.DAILY) {
             val date = todayUtcDate()
             val seed = loadDailySeed(date)
@@ -287,6 +314,7 @@ class Tilt2048ViewModel(
         if (previousSessionId != null && !previousFinished) {
             finishSession(previousSessionId, previousScore, previousMode = _uiState.value.mode)
         }
+
         startSessionForState(gameState, currentMode, currentDailyDate, currentDailySeed)
 
         if (currentMode == GameMode.DAILY) {
@@ -339,23 +367,46 @@ class Tilt2048ViewModel(
         }
     }
 
+    /**
+     * Less-sensitive shake detection using only x/y + timestamp:
+     * Detect "jerk" = rapid change in magnitude across samples, then require sustained variability.
+     */
     private fun detectShake(sample: TiltSample) {
-        // if (!gameEngine.getState().isGameOver) return
+        // Only allow shake-to-reset after game over (your rule)
+        if (!gameEngine.getState().isGameOver) return
 
-        // val magnitude = hypot(sample.x.toDouble(), sample.y.toDouble()).toFloat()
-        // shakeHistory.addLast(magnitude)
-        // if (shakeHistory.size > 5) shakeHistory.removeFirst()
+        val now = sample.timestampMillis
+        if (now - lastShakeTime < SHAKE_COOLDOWN_MS) return
 
-        // val now = sample.timestampMillis
-        // if (now - lastShakeTime < SHAKE_COOLDOWN_MS) return
+        val mag = hypot(sample.x.toDouble(), sample.y.toDouble()).toFloat()
+        val prev = lastShakeMagnitude
+        lastShakeMagnitude = mag
+        if (prev == null) return
 
-        // val avg = shakeHistory.average().toFloat()
-        // if (avg > SHAKE_THRESHOLD) {
-        //     lastShakeTime = now
-        //     shakeHistory.clear()
-        //     viewModelScope.launch { startGame(currentMode) }
-        // }
+        val jerk = abs(mag - prev)
+
+        shakeHistory.addLast(jerk)
+        if (shakeHistory.size > SHAKE_WINDOW_SIZE) shakeHistory.removeFirst()
+        if (shakeHistory.size < SHAKE_WINDOW_SIZE) return
+
+        val avg = shakeHistory.average().toFloat()
+        val peak = shakeHistory.maxOrNull() ?: 0f
+        val min = shakeHistory.minOrNull() ?: 0f
+        val range = peak - min
+
+        val passes =
+            peak >= SHAKE_JERK_THRESHOLD &&
+                    peak >= avg * SHAKE_PEAK_MULTIPLIER &&
+                    range >= SHAKE_RANGE_THRESHOLD
+
+        if (passes) {
+            lastShakeTime = now
+            shakeHistory.clear()
+            lastShakeMagnitude = null
+            viewModelScope.launch { startGame(currentMode) }
+        }
     }
+
     private suspend fun loadDailySeed(challengeDate: String): Long {
         return try {
             val seed = repository.getOrFetchDailySeed(challengeDate)
@@ -412,6 +463,7 @@ class Tilt2048ViewModel(
         val challengeDate = currentDailyDate ?: todayUtcDate()
         val seed = currentDailySeed ?: return
         val score = gameEngine.getState().score
+
         val upload = DailyScoreUpload(
             challengeDate = challengeDate,
             seed = seed,
@@ -460,6 +512,7 @@ class Tilt2048ViewModel(
         _uiState.update { current ->
             current.copy(
                 tiltControlsEnabled = settings.tiltEnabled,
+                shakeToResetEnabled = settings.shakeToResetEnabled,
                 tiltSensitivity = settings.sensitivity.coerceIn(MIN_SENSITIVITY, MAX_SENSITIVITY)
             )
         }
@@ -471,6 +524,7 @@ class Tilt2048ViewModel(
             repository.saveSettings(
                 PersistedSettings(
                     tiltEnabled = state.tiltControlsEnabled,
+                    shakeToResetEnabled = state.shakeToResetEnabled,
                     sensitivity = state.tiltSensitivity,
                     calibrationBaselineX = neutralX,
                     calibrationBaselineY = neutralY
@@ -505,9 +559,7 @@ class Tilt2048ViewModel(
     }
 
     private suspend fun ensureSessionExists(state: GameState) {
-        if (currentSessionId != null) {
-            return
-        }
+        if (currentSessionId != null) return
         startSessionForState(state, currentMode, currentDailyDate, currentDailySeed)
     }
 
@@ -545,6 +597,9 @@ class Tilt2048ViewModel(
                 score = score,
                 mode = previousMode.name.lowercase()
             )
+            _uiState.update { current ->
+                current.copy(highestScore = maxOf(current.highestScore, score))
+            }
         }
     }
 
@@ -644,8 +699,14 @@ class Tilt2048ViewModel(
         private const val NEUTRAL_RESET_MULTIPLIER = 0.6f
         private const val DEBUG_NEUTRAL_THRESHOLD = 0.35f
         private const val AUTO_SAVE_INTERVAL_MS = 5_000L
-        private const val SHAKE_THRESHOLD = 8f
-        private const val SHAKE_COOLDOWN_MS = 2000L
+
+        // Shake tuning (less sensitive, x/y-only jerk window)
+        private const val SHAKE_WINDOW_SIZE = 10
+        private const val SHAKE_COOLDOWN_MS = 2500L
+        private const val SHAKE_JERK_THRESHOLD = 1.5f
+        private const val SHAKE_PEAK_MULTIPLIER = 2.0f
+        private const val SHAKE_RANGE_THRESHOLD = 1.2f
+
         private const val LEADERBOARD_LIMIT = 10
         private const val DEFAULT_PLAYER_NAME = "Player"
         const val MIN_SENSITIVITY = 0.6f

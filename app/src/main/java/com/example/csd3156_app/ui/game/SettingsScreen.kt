@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 fun SettingsScreen(
     uiState: Tilt2048UiState,
     onTiltControlsEnabledChanged: (Boolean) -> Unit,
+    onShakeToResetEnabledChanged: (Boolean) -> Unit,
     onTiltSensitivityChanged: (Float) -> Unit,
     onBack: () -> Unit
 ) {
@@ -44,6 +45,17 @@ fun SettingsScreen(
                 onCheckedChange = { enabled ->
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onTiltControlsEnabledChanged(enabled)
+                }
+            )
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Shake to Reset", modifier = Modifier.weight(1f))
+            Switch(
+                checked = uiState.shakeToResetEnabled,
+                onCheckedChange = { enabled ->
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onShakeToResetEnabledChanged(enabled)
                 }
             )
         }

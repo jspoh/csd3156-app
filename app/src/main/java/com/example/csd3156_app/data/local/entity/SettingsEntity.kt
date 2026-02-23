@@ -8,6 +8,7 @@ data class SettingsEntity(
     @PrimaryKey
     val id: Long = SETTINGS_SINGLETON_ID,
     val tiltEnabled: Boolean,
+    val shakeToResetEnabled: Boolean,
     val sensitivity: Float,
     val calibrationBaseline: String,
     val updatedAt: Long
