@@ -1,9 +1,12 @@
 package com.example.csd3156_app.ui.game
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -193,16 +196,6 @@ fun Tilt2048Screen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // GAME MESSAGES
-            if (uiState.hasWon) {
-                Text(
-                    text = "Victory! 2048!",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color(0xFF2E7D32),
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-            }
-
             // THE BOARD
             AnimatedGameBoard(
                 board = uiState.board,
@@ -237,7 +230,8 @@ fun Tilt2048Screen(
                 DailyLeaderboardSection(uiState, onSubmitDailyScore, onRefreshLeaderboard)
             }
 
-            // DEBUG TILT INFO - remove when controls feel good
+            // DEBUG TILT INFO
+
             if (uiState.tiltSensorAvailable) {
                 Column(
                     modifier = Modifier
@@ -269,50 +263,109 @@ fun Tilt2048Screen(
             }
         }
 
-        if (showGameOverDialog && uiState.isGameOver) {
-            AlertDialog(
-                onDismissRequest = {},
-                title = {
-                    Text("Game Over", fontWeight = FontWeight.Bold)
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Your final score: ${uiState.score}")
-                        if (uiState.mode == GameMode.DAILY) {
-                            Text(
-                                text = "Daily Challenge (${uiState.dailyDate})",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.Gray
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            showGameOverDialog = false
-                            onNewGame()
-                        }
-                    ) {
-                        Text("Restart")
-                    }
-                },
-                dismissButton = {
-                    OutlinedButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            showGameOverDialog = false
-                            onBackToMenu()
-                        }
-                    ) {
-                        Text("Main Menu")
-                    }
-                }
+        // Game result overlay — shown on top of the board
+        AnimatedVisibility(
+            visible = uiState.hasWon || uiState.isGameOver,
+            enter = fadeIn(tween(400)) + scaleIn(tween(400), initialScale = 0.85f)
+        ) {
+            GameResultOverlay(
+                hasWon = uiState.hasWon,
+                score = uiState.score,
+                onNewGame = onNewGame
             )
         }
     }
 }
+
+/**
+ * Full-screen overlay displayed when the player wins or loses.
+ */
+@Composable
+fun GameResultOverlay(
+    hasWon: Boolean,
+    score: Int,
+    onNewGame: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    val overlayBg = if (hasWon) Color(0xE8F9F1E8) else Color(0xE8201A18)
+    val titleColor = if (hasWon) Color(0xFF776E65) else Color(0xFFEEE4DA)
+    val subtitleColor = if (hasWon) Color(0xFF8B6914) else Color(0xFFBBB)
+    val btnContainerColor = if (hasWon) Color(0xFFEDC22E) else Color(0xFFF65E3B)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(overlayBg),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Text(
+                text = if (hasWon) "YOU WIN!" else "GAME OVER",
+                fontSize = 48.sp,
+                fontWeight = FontWeight.Bold,
+                color = titleColor
+            )
+
+            if (hasWon) {
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .background(Color(0xFFEDC22E), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "2048",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            Text(
+                text = "Score: $score",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = subtitleColor
+            )
+
+            if (!hasWon) {
+                Text(
+                    text = "No more moves available",
+                    fontSize = 14.sp,
+                    color = subtitleColor
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onNewGame()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = btnContainerColor,
+                    contentColor = Color.White
+                ),
+                modifier = Modifier
+                    .fillMaxWidth(0.6f)
+                    .height(52.dp)
+            ) {
+                Text(
+                    text = if (hasWon) "Play Again" else "Try Again",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
 /**
  * Fix: Helper function to define button colors based on selection
  */

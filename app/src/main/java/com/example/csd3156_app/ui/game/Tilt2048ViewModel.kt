@@ -323,6 +323,10 @@ class Tilt2048ViewModel(
     }
 
     private fun applyMove(direction: Direction) {
+        // Block all input while the game result overlay is visible
+        val currentUiState = _uiState.value
+        if (currentUiState.isGameOver || currentUiState.hasWon) return
+
         val result = gameEngine.move(direction)
         if (!result.moved) {
             return
@@ -342,6 +346,8 @@ class Tilt2048ViewModel(
             dailySeed = currentDailySeed
         )
 
+        val gameEnded = result.state.isGameOver || result.state.hasWon
+
         viewModelScope.launch {
             ensureSessionExists(result.state)
             val sessionId = currentSessionId
@@ -354,7 +360,7 @@ class Tilt2048ViewModel(
                     isFinished = result.state.isGameOver
                 )
             }
-            if (result.state.isGameOver) {
+            if (gameEnded) {
                 finishCurrentSessionIfNeeded(result.state.score)
                 submitDailyScoreIfNeeded(force = false)
             }
@@ -449,7 +455,8 @@ class Tilt2048ViewModel(
         if (!force && dailyUploadHandledForSession) {
             return
         }
-        if (!force && !gameEngine.getState().isGameOver) {
+        val engineState = gameEngine.getState()
+        if (!force && !engineState.isGameOver && !engineState.hasWon) {
             return
         }
 
