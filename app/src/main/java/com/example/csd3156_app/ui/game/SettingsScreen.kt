@@ -72,7 +72,7 @@ fun SettingsScreen(
             onValueChangeFinished = {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             },
-            valueRange = 0.5f..5.0f
+            valueRange = 0.5f..2.0f
         )
 
         Spacer(modifier = Modifier.weight(1f))
