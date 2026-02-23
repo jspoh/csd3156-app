@@ -271,7 +271,8 @@ fun Tilt2048Screen(
             GameResultOverlay(
                 hasWon = uiState.hasWon,
                 score = uiState.score,
-                onNewGame = onNewGame
+                onNewGame = onNewGame,
+                onBackToMenu = onBackToMenu
             )
         }
     }
@@ -284,7 +285,8 @@ fun Tilt2048Screen(
 fun GameResultOverlay(
     hasWon: Boolean,
     score: Int,
-    onNewGame: () -> Unit
+    onNewGame: () -> Unit,
+    onBackToMenu: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val overlayBg = if (hasWon) Color(0xE8F9F1E8) else Color(0xE8201A18)
@@ -341,7 +343,7 @@ fun GameResultOverlay(
                 )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             Button(
                 onClick = {
@@ -358,6 +360,26 @@ fun GameResultOverlay(
             ) {
                 Text(
                     text = if (hasWon) "Play Again" else "Try Again",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            OutlinedButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onBackToMenu()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = btnContainerColor,
+                    contentColor = Color.White
+                ),
+                modifier = Modifier
+                    .fillMaxWidth(0.6f)
+                    .height(52.dp)
+            ) {
+                Text(
+                    text = "Main Menu",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
