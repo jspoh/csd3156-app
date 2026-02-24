@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -22,11 +23,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.sp
 
 private const val PREFS_NAME = "tilt2048_prefs"
 private const val KEY_PLAYER_NAME = "player_name"
@@ -43,6 +46,7 @@ fun MenuScreen(onStartGame: (String) -> Unit, onSettings: () -> Unit) {
     }
     // For vibration
     val haptic = LocalHapticFeedback.current
+    var showTutorial by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -78,8 +82,26 @@ fun MenuScreen(onStartGame: (String) -> Unit, onSettings: () -> Unit) {
             .height(60.dp)) {
             Text("SETTINGS")
         }
-    }
+        Spacer(modifier = Modifier.height(16.dp))
+        OutlinedButton(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showTutorial = true // Open the tutorial
+            },
+            modifier = Modifier.fillMaxWidth().height(60.dp)
+        ) {
+            Text(
+                text = "HOW TO PLAY"
+            )
+        }
 
+
+    }
+    if (showTutorial) {
+        TiltTutorialOverlay(
+            onDismiss = { showTutorial = false } // Close it without saving to SharedPreferences
+        )
+    }
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },

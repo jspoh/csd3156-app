@@ -3,7 +3,11 @@ package com.example.csd3156_app.ui.game
 import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -119,6 +123,11 @@ fun Tilt2048Screen(
     var dragDelta by remember { mutableStateOf(Offset.Zero) }
     var showGameOverDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
+    var showTutorial by remember {
+        val prefs = context.getSharedPreferences("tilt2048_prefs", android.content.Context.MODE_PRIVATE)
+        mutableStateOf(!prefs.getBoolean("tutorial_seen", false))
+    }
 
     LaunchedEffect(uiState.isGameOver) {
         if (uiState.isGameOver) {
@@ -275,8 +284,21 @@ fun Tilt2048Screen(
             GameResultOverlay(
                 hasWon = uiState.hasWon,
                 score = uiState.score,
+                shakeEnabled = uiState.shakeToResetEnabled,
                 onNewGame = onNewGame,
                 onBackToMenu = onBackToMenu
+            )
+        }
+
+        if (showTutorial) {
+            TiltTutorialOverlay(
+                onDismiss = {
+                    showTutorial = false
+                    context.getSharedPreferences("tilt2048_prefs", android.content.Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("tutorial_seen", true)
+                        .apply()
+                }
             )
         }
     }
@@ -289,6 +311,7 @@ fun Tilt2048Screen(
 fun GameResultOverlay(
     hasWon: Boolean,
     score: Int,
+    shakeEnabled: Boolean,
     onNewGame: () -> Unit,
     onBackToMenu: () -> Unit
 ) {
@@ -387,6 +410,20 @@ fun GameResultOverlay(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
+            }
+
+            if (shakeEnabled && !hasWon) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Shake phone to restart",
+                        fontSize = 14.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
     }
@@ -671,16 +708,16 @@ fun DailyLeaderboardSection(uiState: Tilt2048UiState, onSubmit: () -> Unit, onRe
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onSubmit()
-                },
-                enabled = !uiState.isSubmittingDailyScore,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(if (uiState.isSubmittingDailyScore) "Submitting..." else "Submit Score")
-            }
+//            Button(
+//                onClick = {
+//                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+//                    onSubmit()
+//                },
+//                enabled = !uiState.isSubmittingDailyScore,
+//                modifier = Modifier.weight(1f)
+//            ) {
+//                Text(if (uiState.isSubmittingDailyScore) "Submitting..." else "Submit Score")
+//            }
             Button(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -749,6 +786,112 @@ fun DailyLeaderboardSection(uiState: Tilt2048UiState, onSubmit: () -> Unit, onRe
                 TextButton(onClick = { showModal = false }) { Text("Close") }
             }
         )
+    }
+}
+
+@Composable
+fun TiltTutorialOverlay(onDismiss: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
+    val infiniteTransition = rememberInfiniteTransition(label = "tilt_hint")
+    val rockAngle by infiniteTransition.animateFloat(
+        initialValue = -15f,
+        targetValue = 15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = androidx.compose.animation.core.EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "rock"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xCC000000)),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF9F1E8))
+        ) {
+            Column(
+                modifier = Modifier.padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "How to Play",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF776E65)
+                )
+
+                // Animated rocking phone icon
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .graphicsLayer { rotationZ = rockAngle },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(44.dp)
+                            .height(80.dp)
+                            .background(Color(0xFF776E65), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(36.dp)
+                                .height(64.dp)
+                                .background(Color(0xFFBBADA0), RoundedCornerShape(4.dp))
+                        )
+                    }
+                }
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.Start,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    TutorialRow(emoji = "📱", text = "Hold your phone flat, face up")
+                    TutorialRow(emoji = "⬅️", text = "Tilt left to move tiles left")
+                    TutorialRow(emoji = "➡️", text = "Tilt right to move tiles right")
+                    TutorialRow(emoji = "⬆️", text = "Tilt away to move tiles up")
+                    TutorialRow(emoji = "⬇️", text = "Tilt toward you to move tiles down")
+                    TutorialRow(emoji = "👆", text = "Or swipe on the board to move tiles")
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFEDC22E),
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                ) {
+                    Text("Got it, let's play!", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TutorialRow(emoji: String, text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(text = emoji, fontSize = 18.sp)
+        Text(text = text, fontSize = 14.sp, color = Color(0xFF776E65))
     }
 }
 

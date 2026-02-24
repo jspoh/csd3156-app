@@ -367,12 +367,10 @@ class Tilt2048ViewModel(
         }
     }
 
-    /**
-     * Less-sensitive shake detection using only x/y + timestamp:
-     * Detect "jerk" = rapid change in magnitude across samples, then require sustained variability.
-     */
+    // Detect "jerk" = rapid change in magnitude across samples, then require sustained variability.
+
     private fun detectShake(sample: TiltSample) {
-        // Only allow shake-to-reset after game over (your rule)
+        // Only allow shake-to-reset after game over
         if (!gameEngine.getState().isGameOver) return
 
         val now = sample.timestampMillis
